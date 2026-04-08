@@ -1,0 +1,10 @@
+﻿dataset:
+  path: data/input/dataset_clean.jsonl
+  label_column: category_teacher_final
+  text_column: model_input
+
+split:
+  train_size: 0.8
+  val_size: 0.1
+  test_size: 0.1
+  seed: 42

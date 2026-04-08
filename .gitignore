@@ -1,6 +1,10 @@
-
-/dataset_clean.jsonl
-/.venv/
-*.idea
-*.iml
-*.xml
+.venv/
+__pycache__/
+*.pyc
+.idea/
+.pytest_cache/
+data/input/*.jsonl
+data/processed/*
+!data/processed/.gitkeep
+data/artifacts/*
+!data/artifacts/.gitkeep
