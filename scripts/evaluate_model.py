@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -15,7 +15,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from signal_backend.data.load_jsonl import load_dataset_dataframe
-from signal_backend.inference.batch_predict import predict_batch
+from signal_backend.inference import load_artifact, predict_batch
 from signal_backend.paths import TEST_SPLIT_PATH
 from signal_backend.training.metrics import compute_evaluation_result
 from signal_backend.training.save_artifacts import save_evaluation_artifacts, save_json
@@ -77,13 +77,16 @@ def main() -> int:
         texts = dataset_df["model_input"].astype(str).tolist()
         y_true = dataset_df["category_teacher_final"].astype(str).tolist()
 
-        if model_type in BASELINE_MODELS:
+        if args.artifact_dir is not None:
+            loaded_artifact = load_artifact(root_dir)
+            predictions = predict_batch(loaded_artifact, texts)
+            y_pred = [item["prediction"] for item in predictions]
+        elif model_type in BASELINE_MODELS:
             model = joblib.load(model_path)
             vectorizer = joblib.load(vectorizer_path)
             y_pred = _predict_with_baseline(model_type, model, vectorizer, texts, id_to_label)
         elif model_type == TRANSFORMER_MODEL:
-            predictions = predict_batch(texts, root_dir)
-            y_pred = [item["label"] for item in predictions]
+            raise ValueError("Transformer evaluation requires --artifact-dir.")
         else:
             raise ValueError(f"Unsupported model_type for evaluation: {model_type}")
 

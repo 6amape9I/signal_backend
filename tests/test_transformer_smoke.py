@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import subprocess
@@ -15,7 +15,7 @@ from signal_backend.inference.batch_predict import predict_batch
 from signal_backend.inference.predict import predict_one
 
 
-PYTHON = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
+PYTHON = sys.executable
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, str]]) -> None:
@@ -99,7 +99,7 @@ def test_transformer_smoke(tmp_path: Path) -> None:
     )
 
     completed = subprocess.run(
-        [str(PYTHON), "scripts/train_transformer.py", "--config", str(config_path)],
+        [PYTHON, "scripts/train_transformer.py", "--config", str(config_path)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -125,5 +125,5 @@ def test_transformer_smoke(tmp_path: Path) -> None:
     one_prediction = predict_one("sports keyword sample", artifact_dir)
     batch_predictions = predict_batch(["sports keyword sample", "politics keyword sample"], artifact_dir, batch_size=2)
 
-    assert "label" in one_prediction
+    assert "prediction" in one_prediction
     assert len(batch_predictions) == 2

@@ -1,0 +1,5 @@
+default_artifact_dir: data/artifacts/baseline_tfidf_logreg
+host: 127.0.0.1
+port: 8000
+batch_size: 8
+max_request_items: 128

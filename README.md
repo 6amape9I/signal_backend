@@ -8,11 +8,13 @@ Implemented stages:
 - reproducible `train` / `val` / `test` split
 - baseline training with TF-IDF models
 - transformer training with artifact-ready inference utilities
+- unified inference layer for baseline and transformer artifacts
+- minimal FastAPI service over the inference layer
 
 Out of scope at this stage:
-- HTTP inference API
 - deployment
-- frontend integration
+- Docker / reverse proxy
+- frontend integration inside this repository
 
 ## Dataset Location
 
@@ -28,18 +30,21 @@ The default offline transformer config points to:
 
 `resources/base_models/mmBERT-base`
 
-This directory stores the minimal local tokenizer/config assets for transformer initialization. If pretrained weights are absent, the pipeline initializes the classifier from local config instead of silently fetching weights from the network.
+This directory stores the minimal local tokenizer/config assets for transformer initialization. If pretrained weights are absent, the training pipeline initializes the classifier from local config instead of silently fetching weights from the network.
 
 ## Project Areas
 
 - `src/signal_backend/data/`: dataset loading, validation, split, label mapping, dataset settings
 - `src/signal_backend/baselines/`: TF-IDF baseline models
 - `src/signal_backend/training/`: shared metrics, evaluation, artifact saving, logging utilities, transformer training loop
+- `src/signal_backend/inference/`: artifact loading, model_input building, unified predictor layer, Python inference wrappers
+- `src/signal_backend/serving/`: API schemas, settings, service layer
 - `src/signal_backend/models/`: transformer model loading helpers
-- `src/signal_backend/inference/`: Python-level inference helpers for saved transformer artifacts
 - `configs/data/dataset_config.yaml`: dataset and split defaults
 - `configs/train/*.yaml`: baseline and transformer training configs
+- `configs/inference/api_config.yaml`: FastAPI defaults
 - `scripts/`: runnable CLIs
+- `apps/api/main.py`: FastAPI app entrypoint
 
 ## Commands
 
@@ -79,15 +84,88 @@ Train transformer classifier:
 python scripts/train_transformer.py --config configs/train/transformer_classifier.yaml
 ```
 
-## Baseline vs Transformer
+Run the local API:
 
-Baseline models:
-- `tfidf_logreg`: TF-IDF + Logistic Regression with probabilities
-- `tfidf_linear_svm`: TF-IDF + Linear SVM with decision scores
+```bash
+python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+```
 
-Transformer model:
-- `transformer_classifier`: Hugging Face sequence classifier trained on `model_input -> category_teacher_final`
-- the default config points to the local `resources/base_models/mmBERT-base` directory; if local weights are absent, the pipeline falls back to model initialization from config instead of using silent network behavior
+## Unified Inference Layer
+
+Python-level inference works for both baseline and transformer artifacts.
+
+Main entry points:
+- `load_artifact(artifact_dir: Path)`
+- `build_model_input(title, text, model_input)`
+- `predict_one_from_artifact(artifact_dir, *, title=None, text=None, model_input=None)`
+- `predict_batch_from_artifact(artifact_dir, items=[...])`
+
+Prediction result format:
+- `prediction`
+- `label_id`
+- `scores`
+- `score_type`
+- `label_order`
+- `model_type`
+
+`scores` are exposed as a mapping `label -> score`. For `tfidf_logreg` and `transformer_classifier` these are probabilities. For `tfidf_linear_svm` these are decision scores.
+
+## FastAPI Endpoints
+
+Available endpoints:
+- `GET /health`
+- `POST /predict`
+- `POST /batch_predict`
+
+Example `/predict` request:
+
+```json
+{
+  "title": "Команда выиграла матч",
+  "text": "Спортсмены забили три гола и уверенно победили.",
+  "artifact_dir": "data/artifacts/baseline_tfidf_logreg"
+}
+```
+
+Example `/predict` response:
+
+```json
+{
+  "prediction": "Спорт",
+  "label_id": 2,
+  "scores": {
+    "Общество": 0.08,
+    "Политика": 0.04,
+    "Спорт": 0.81,
+    "Экономика_и_бизнес": 0.07
+  },
+  "score_type": "probabilities",
+  "label_order": [
+    "Общество",
+    "Политика",
+    "Спорт",
+    "Экономика_и_бизнес"
+  ],
+  "model_type": "tfidf_logreg"
+}
+```
+
+Example `/batch_predict` request:
+
+```json
+{
+  "artifact_dir": "data/artifacts/baseline_tfidf_logreg",
+  "items": [
+    {
+      "title": "Команда выиграла матч",
+      "text": "Спортсмены забили три гола и уверенно победили."
+    },
+    {
+      "model_input": "Новый законопроект обсудили в парламенте."
+    }
+  ]
+}
+```
 
 ## Artifact Format
 

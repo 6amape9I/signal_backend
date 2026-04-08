@@ -1,12 +1,13 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PYTHON = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
+PYTHON = sys.executable
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, str]]) -> None:
@@ -70,7 +71,7 @@ def _run_training(tmp_path: Path, model_type: str) -> Path:
     _write_baseline_config(config_path, model_type, output_dir, train_path, val_path, test_path)
 
     completed = subprocess.run(
-        [str(PYTHON), "scripts/train_baseline.py", "--config", str(config_path)],
+        [PYTHON, "scripts/train_baseline.py", "--config", str(config_path)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
