@@ -4,6 +4,8 @@
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIGS_DIR = REPO_ROOT / "configs"
 TRAIN_CONFIGS_DIR = CONFIGS_DIR / "train"
+RESOURCES_DIR = REPO_ROOT / "resources"
+BASE_MODELS_DIR = RESOURCES_DIR / "base_models"
 DATA_DIR = REPO_ROOT / "data"
 INPUT_DIR = DATA_DIR / "input"
 PROCESSED_DIR = DATA_DIR / "processed"
@@ -15,10 +17,4 @@ VAL_SPLIT_PATH = PROCESSED_DIR / "val.jsonl"
 TEST_SPLIT_PATH = PROCESSED_DIR / "test.jsonl"
 DATASET_SUMMARY_PATH = PROCESSED_DIR / "dataset_summary.json"
 SPLIT_REPORT_PATH = PROCESSED_DIR / "split_report.json"
-LEGACY_MMBERT_BASE_DIR = (
-    REPO_ROOT
-    / "ml_removed_from_signal"
-    / "finetune_pipeline"
-    / "base_models"
-    / "mmBERT-base"
-)
+LOCAL_MMBERT_BASE_DIR = BASE_MODELS_DIR / "mmBERT-base"

@@ -22,11 +22,19 @@ The project expects the local dataset at:
 
 The repository root must not be used as a working dataset path.
 
+## Local Base Model
+
+The default offline transformer config points to:
+
+`resources/base_models/mmBERT-base`
+
+This directory stores the minimal local tokenizer/config assets for transformer initialization. If pretrained weights are absent, the pipeline initializes the classifier from local config instead of silently fetching weights from the network.
+
 ## Project Areas
 
 - `src/signal_backend/data/`: dataset loading, validation, split, label mapping, dataset settings
 - `src/signal_backend/baselines/`: TF-IDF baseline models
-- `src/signal_backend/training/`: shared metrics, evaluation, artifact saving, transformer training loop
+- `src/signal_backend/training/`: shared metrics, evaluation, artifact saving, logging utilities, transformer training loop
 - `src/signal_backend/models/`: transformer model loading helpers
 - `src/signal_backend/inference/`: Python-level inference helpers for saved transformer artifacts
 - `configs/data/dataset_config.yaml`: dataset and split defaults
@@ -79,7 +87,7 @@ Baseline models:
 
 Transformer model:
 - `transformer_classifier`: Hugging Face sequence classifier trained on `model_input -> category_teacher_final`
-- default config points to the local `mmBERT-base` directory; if local weights are absent, the pipeline falls back to model initialization from config instead of using silent network behavior
+- the default config points to the local `resources/base_models/mmBERT-base` directory; if local weights are absent, the pipeline falls back to model initialization from config instead of using silent network behavior
 
 ## Artifact Format
 
@@ -96,10 +104,13 @@ Common artifacts:
 - `run_summary.json`
 
 Baseline-specific artifacts:
+- `train.log`
+- `train_log.jsonl`
 - `model.joblib`
 - `vectorizer.joblib`
 
 Transformer-specific artifacts:
+- `train.log`
 - `train_log.jsonl`
 - `tokenizer/`
 - `best_model/`

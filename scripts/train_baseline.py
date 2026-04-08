@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+import traceback
 from pathlib import Path
 
 import joblib
@@ -19,15 +20,15 @@ from signal_backend.config import ConfigError, load_yaml_config, resolve_path
 from signal_backend.data.dataset_settings import load_dataset_settings
 from signal_backend.training.evaluate import (
     build_train_label_mapping,
-    dataframe_texts,
     dataframe_labels,
+    dataframe_texts,
     evaluate_dataframe,
     load_split_data,
 )
+from signal_backend.training.logging_utils import log_event, setup_training_logger
 from signal_backend.training.save_artifacts import (
     build_run_directory,
     save_evaluation_artifacts,
-    save_json,
     save_label_mapping,
     save_run_summary,
     save_yaml,
@@ -83,9 +84,31 @@ def _load_effective_config(config_path: Path, model_type_override: str | None) -
 
 def main() -> int:
     args = parse_args()
+    logger = None
+    event_log_path = None
+    run_dir = None
 
     try:
         effective_config = _load_effective_config(args.config, args.model_type)
+        model_type = effective_config["model"]["type"]
+        run_dir = build_run_directory(
+            model_type=model_type,
+            run_name=effective_config["run"].get("run_name"),
+            output_dir=Path(effective_config["run"]["output_dir"]),
+        )
+        logger, event_log_path = setup_training_logger(run_dir)
+        logger.info("Starting baseline training for %s", model_type)
+        log_event(
+            event_log_path,
+            event="run_started",
+            payload={
+                "model_type": model_type,
+                "config_path": str(args.config.resolve()),
+                "effective_config": effective_config,
+                "run_dir": run_dir.as_posix(),
+            },
+        )
+
         split_data = load_split_data(
             train_path=Path(effective_config["data"]["train_path"]),
             val_path=Path(effective_config["data"]["val_path"]),
@@ -96,7 +119,15 @@ def main() -> int:
         train_texts = dataframe_texts(split_data.train_df)
         train_label_ids = [label_to_id[label] for label in dataframe_labels(split_data.train_df)]
         random_state = int(effective_config["run"]["random_state"])
-        model_type = effective_config["model"]["type"]
+
+        logger.info(
+            "Loaded split data | train=%d val=%d test=%d classes=%s",
+            len(split_data.train_df),
+            len(split_data.val_df),
+            len(split_data.test_df),
+            ", ".join(labels),
+        )
+        logger.info("Fitting %s", model_type)
 
         if model_type == "tfidf_logreg":
             bundle = train_tfidf_logreg(
@@ -117,6 +148,17 @@ def main() -> int:
             )
             predictor = lambda texts: predict_with_linear_svm(bundle, texts, id_to_label)
 
+        logger.info("Model fit completed")
+        log_event(
+            event_log_path,
+            event="fit_completed",
+            payload={
+                "model_type": model_type,
+                "features": effective_config["features"],
+                "model": effective_config["model"],
+            },
+        )
+
         val_result, _ = evaluate_dataframe(
             split_name="val",
             df=split_data.val_df,
@@ -130,11 +172,17 @@ def main() -> int:
             predictor=predictor,
         )
 
-        run_dir = build_run_directory(
-            model_type=model_type,
-            run_name=effective_config["run"].get("run_name"),
-            output_dir=Path(effective_config["run"]["output_dir"]),
+        logger.info("Validation metrics: %s", json.dumps(val_result.metrics, ensure_ascii=False))
+        logger.info("Test metrics: %s", json.dumps(test_result.metrics, ensure_ascii=False))
+        log_event(
+            event_log_path,
+            event="evaluation_completed",
+            payload={
+                "val_metrics": val_result.metrics,
+                "test_metrics": test_result.metrics,
+            },
         )
+
         joblib.dump(bundle.model, run_dir / "model.joblib")
         joblib.dump(bundle.vectorizer, run_dir / "vectorizer.joblib")
         save_evaluation_artifacts(model_type=model_type, results=[val_result, test_result], run_dir=run_dir)
@@ -160,12 +208,44 @@ def main() -> int:
             },
         }
         save_run_summary(run_summary, run_dir)
+        log_event(
+            event_log_path,
+            event="artifacts_saved",
+            payload={
+                "run_dir": run_dir.as_posix(),
+                "artifacts": [
+                    "train.log",
+                    "train_log.jsonl",
+                    "metrics.json",
+                    "classification_report.json",
+                    "confusion_matrix.csv",
+                    "label_mapping.json",
+                    "config_snapshot.yaml",
+                    "model.joblib",
+                    "vectorizer.joblib",
+                    "run_summary.json",
+                ],
+            },
+        )
+        logger.info("Artifacts saved to %s", run_dir)
 
         print("Baseline training summary:")
         print(json.dumps({"run_dir": run_dir.as_posix(), **run_summary}, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:
-        print(f"Baseline training failed: {exc}", file=sys.stderr)
+        if logger is not None and event_log_path is not None and run_dir is not None:
+            logger.exception("Baseline training failed")
+            log_event(
+                event_log_path,
+                event="run_failed",
+                payload={
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "traceback": traceback.format_exc(),
+                },
+            )
+        else:
+            print(f"Baseline training failed: {exc}", file=sys.stderr)
         return 1
 
 

@@ -76,6 +76,7 @@ def test_transformer_smoke(tmp_path: Path) -> None:
                 f"  val_path: {val_path.as_posix()}",
                 f"  test_path: {test_path.as_posix()}",
                 "model:",
+                "  type: transformer_classifier",
                 f"  model_name_or_path: {model_dir.as_posix()}",
                 "  max_length: 32",
                 "training:",
@@ -107,14 +108,19 @@ def test_transformer_smoke(tmp_path: Path) -> None:
     assert completed.returncode == 0, completed.stderr
 
     artifact_dir = output_dir / "transformer_smoke"
+    event_lines = (artifact_dir / "train_log.jsonl").read_text(encoding="utf-8").splitlines()
     assert (artifact_dir / "best_model").exists()
     assert (artifact_dir / "tokenizer").exists()
     assert (artifact_dir / "metrics.json").exists()
     assert (artifact_dir / "classification_report.json").exists()
     assert (artifact_dir / "confusion_matrix.csv").exists()
     assert (artifact_dir / "label_mapping.json").exists()
+    assert (artifact_dir / "train.log").exists()
     assert (artifact_dir / "train_log.jsonl").exists()
     assert (artifact_dir / "run_summary.json").exists()
+    assert any('"event": "run_started"' in line for line in event_lines)
+    assert any('"event": "epoch_completed"' in line for line in event_lines)
+    assert any('"event": "artifacts_saved"' in line for line in event_lines)
 
     one_prediction = predict_one("sports keyword sample", artifact_dir)
     batch_predictions = predict_batch(["sports keyword sample", "politics keyword sample"], artifact_dir, batch_size=2)

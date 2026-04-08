@@ -1,9 +1,10 @@
-﻿data:
+data:
   train_path: data/processed/train.jsonl
   val_path: data/processed/val.jsonl
   test_path: data/processed/test.jsonl
 model:
-  model_name_or_path: ml_removed_from_signal/finetune_pipeline/base_models/mmBERT-base
+  type: transformer_classifier
+  model_name_or_path: resources/base_models/mmBERT-base
   max_length: 128
 training:
   batch_size: 8

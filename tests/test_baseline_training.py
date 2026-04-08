@@ -2,7 +2,6 @@
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -91,13 +90,19 @@ def test_logreg_baseline_training_creates_artifacts(tmp_path: Path) -> None:
     assert (artifact_dir / "confusion_matrix.csv").exists()
     assert (artifact_dir / "label_mapping.json").exists()
     assert (artifact_dir / "run_summary.json").exists()
+    assert (artifact_dir / "train.log").exists()
+    assert (artifact_dir / "train_log.jsonl").exists()
 
 
 def test_linear_svm_baseline_training_creates_artifacts(tmp_path: Path) -> None:
     artifact_dir = _run_training(tmp_path, "tfidf_linear_svm")
     metrics_payload = json.loads((artifact_dir / "metrics.json").read_text(encoding="utf-8"))
+    event_lines = (artifact_dir / "train_log.jsonl").read_text(encoding="utf-8").splitlines()
 
     assert (artifact_dir / "model.joblib").exists()
     assert (artifact_dir / "vectorizer.joblib").exists()
+    assert (artifact_dir / "train.log").exists()
     assert metrics_payload["model_type"] == "tfidf_linear_svm"
     assert "val" in metrics_payload and "test" in metrics_payload
+    assert any('"event": "fit_completed"' in line for line in event_lines)
+    assert any('"event": "evaluation_completed"' in line for line in event_lines)
