@@ -66,9 +66,7 @@ def _validate_split_sizes(
 
     total = train_size + val_size + test_size
     if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-9):
-        raise DatasetSplitError(
-            f"Split sizes must sum to 1.0, got {total:.12f}."
-        )
+        raise DatasetSplitError(f"Split sizes must sum to 1.0, got {total:.12f}.")
 
 
 def _validate_split_feasibility(
@@ -101,11 +99,7 @@ def _validate_split_feasibility(
         )
 
     total_rows = len(df)
-    for split_name, split_size in (
-        ("train", train_size),
-        ("val", val_size),
-        ("test", test_size),
-    ):
+    for split_name, split_size in (("train", train_size), ("val", val_size), ("test", test_size)):
         if total_rows * split_size < num_classes:
             raise DatasetSplitError(
                 f"Split '{split_name}' is too small to represent all {num_classes} "
@@ -177,11 +171,18 @@ def create_stratified_split(
     )
 
 
+def _sanitize_json_value(value: Any) -> Any:
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
+
+
 def _write_jsonl(df: pd.DataFrame, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as output_file:
         for row in df.to_dict(orient="records"):
-            output_file.write(json.dumps(row, ensure_ascii=False) + "\n")
+            cleaned_row = {key: _sanitize_json_value(value) for key, value in row.items()}
+            output_file.write(json.dumps(cleaned_row, ensure_ascii=False) + "\n")
 
 
 def save_split_files(
@@ -230,4 +231,3 @@ def save_split_report(report: dict[str, Any], output_path: Path) -> None:
         json.dumps(report, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-

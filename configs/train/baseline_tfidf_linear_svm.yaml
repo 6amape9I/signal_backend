@@ -1,0 +1,18 @@
+﻿features:
+  max_features: 50000
+  ngram_range: [1, 2]
+  min_df: 2
+  max_df: 0.95
+  lowercase: true
+model:
+  type: tfidf_linear_svm
+  class_weight: balanced
+  C: 1.0
+run:
+  run_name: baseline_tfidf_linear_svm
+  output_dir: data/artifacts
+  random_state: 42
+data:
+  train_path: data/processed/train.jsonl
+  val_path: data/processed/val.jsonl
+  test_path: data/processed/test.jsonl

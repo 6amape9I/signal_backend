@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -22,6 +23,16 @@ def _validate_dataset_path(path: Path) -> Path:
     return resolved_path
 
 
+def _replace_nan_with_none(value):
+    if isinstance(value, dict):
+        return {key: _replace_nan_with_none(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_replace_nan_with_none(item) for item in value]
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
+
+
 def load_dataset_records(path: Path) -> list[DatasetRecord]:
     dataset_path = _validate_dataset_path(path)
     records: list[DatasetRecord] = []
@@ -36,6 +47,7 @@ def load_dataset_records(path: Path) -> list[DatasetRecord]:
 
             try:
                 payload = json.loads(line)
+                payload = _replace_nan_with_none(payload)
             except json.JSONDecodeError as exc:
                 raise DatasetLoadError(
                     f"Invalid JSON at line {line_number}: {exc.msg}"

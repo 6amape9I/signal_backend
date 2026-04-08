@@ -11,13 +11,15 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+from signal_backend.config import ConfigError
+from signal_backend.data.dataset_settings import apply_dataset_overrides, load_dataset_settings
 from signal_backend.data.label_mapping import build_label_to_id
 from signal_backend.data.load_jsonl import DatasetLoadError
 from signal_backend.data.validate_dataset import (
     DatasetValidationError,
     validate_dataset,
 )
-from signal_backend.paths import DEFAULT_DATASET_PATH, PROCESSED_DIR
+from signal_backend.paths import PROCESSED_DIR
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-path",
         type=Path,
-        default=DEFAULT_DATASET_PATH,
+        default=None,
         help="Path to the source JSONL dataset.",
     )
     return parser.parse_args()
@@ -40,8 +42,10 @@ def main() -> int:
     args = parse_args()
 
     try:
-        validation_result = validate_dataset(args.dataset_path)
-    except (DatasetLoadError, DatasetValidationError, FileNotFoundError) as exc:
+        settings = load_dataset_settings()
+        settings = apply_dataset_overrides(settings, dataset_path=args.dataset_path)
+        validation_result = validate_dataset(settings.dataset_path)
+    except (ConfigError, DatasetLoadError, DatasetValidationError, FileNotFoundError) as exc:
         print(f"Dataset inspection failed: {exc}", file=sys.stderr)
         return 1
 

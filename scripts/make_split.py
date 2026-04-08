@@ -11,6 +11,12 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+from signal_backend.config import ConfigError
+from signal_backend.data.dataset_settings import (
+    apply_dataset_overrides,
+    apply_split_overrides,
+    load_dataset_settings,
+)
 from signal_backend.data.load_jsonl import DatasetLoadError
 from signal_backend.data.split_dataset import (
     DatasetSplitError,
@@ -23,7 +29,7 @@ from signal_backend.data.validate_dataset import (
     DatasetValidationError,
     validate_dataset,
 )
-from signal_backend.paths import DEFAULT_DATASET_PATH, PROCESSED_DIR
+from signal_backend.paths import PROCESSED_DIR
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,13 +37,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-path",
         type=Path,
-        default=DEFAULT_DATASET_PATH,
+        default=None,
         help="Path to the source JSONL dataset.",
     )
-    parser.add_argument("--train-size", type=float, default=0.8)
-    parser.add_argument("--val-size", type=float, default=0.1)
-    parser.add_argument("--test-size", type=float, default=0.1)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--train-size", type=float, default=None)
+    parser.add_argument("--val-size", type=float, default=None)
+    parser.add_argument("--test-size", type=float, default=None)
+    parser.add_argument("--seed", type=int, default=None)
     return parser.parse_args()
 
 
@@ -45,15 +51,26 @@ def main() -> int:
     args = parse_args()
 
     try:
-        validation_result = validate_dataset(args.dataset_path)
-        split_result = create_stratified_split(
-            validation_result.dataframe,
+        settings = load_dataset_settings()
+        settings = apply_dataset_overrides(settings, dataset_path=args.dataset_path)
+        settings = apply_split_overrides(
+            settings,
             train_size=args.train_size,
             val_size=args.val_size,
             test_size=args.test_size,
             seed=args.seed,
         )
+
+        validation_result = validate_dataset(settings.dataset_path)
+        split_result = create_stratified_split(
+            validation_result.dataframe,
+            train_size=settings.split.train_size,
+            val_size=settings.split.val_size,
+            test_size=settings.split.test_size,
+            seed=settings.split.seed,
+        )
     except (
+        ConfigError,
         DatasetLoadError,
         DatasetValidationError,
         DatasetSplitError,

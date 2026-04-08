@@ -1,0 +1,21 @@
+﻿data:
+  train_path: data/processed/train.jsonl
+  val_path: data/processed/val.jsonl
+  test_path: data/processed/test.jsonl
+model:
+  model_name_or_path: ml_removed_from_signal/finetune_pipeline/base_models/mmBERT-base
+  max_length: 128
+training:
+  batch_size: 8
+  learning_rate: 0.00002
+  weight_decay: 0.01
+  num_epochs: 3
+  gradient_accumulation_steps: 1
+  random_seed: 42
+  class_weight_mode: balanced
+  early_stopping_patience: 2
+scheduler:
+  warmup_ratio: 0.1
+run:
+  run_name: transformer_classifier
+  output_dir: data/artifacts
